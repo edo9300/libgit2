@@ -456,7 +456,7 @@ extern bool git_path_does_fs_decompose_unicode(const char *root);
 
 typedef struct git_path_diriter git_path_diriter;
 
-#if defined(GIT_WIN32) && !defined(__MINGW32__)
+#if defined(GIT_WIN32) && defined(__MINGW32__)
 
 struct git_path_diriter
 {

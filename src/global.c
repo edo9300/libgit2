@@ -141,21 +141,14 @@ static void shutdown_common(void)
  */
 #if defined(GIT_THREADS) && defined(GIT_WIN32)
 
-static DWORD _fls_index;
+static DWORD _tls_index;
 static volatile LONG _mutex = 0;
-
-static void WINAPI fls_free(void *st)
-{
-	git__global_state_cleanup(st);
-	git__free(st);
-}
 
 static int synchronized_threads_init(void)
 {
 	int error;
 
-	if ((_fls_index = FlsAlloc(fls_free)) == FLS_OUT_OF_INDEXES)
-		return -1;
+	_tls_index = TlsAlloc();
 
 	git_threads_init();
 
@@ -197,7 +190,9 @@ int git_libgit2_shutdown(void)
 	if ((ret = git_atomic_dec(&git__n_inits)) == 0) {
 		shutdown_common();
 
-		FlsFree(_fls_index);
+		git__free_tls_data();
+
+		TlsFree(_tls_index);
 		git_mutex_free(&git__mwindow_mutex);
 
 #if defined(GIT_MSVC_CRTDBG)
@@ -218,7 +213,7 @@ git_global_st *git__global_state(void)
 
 	assert(git_atomic_get(&git__n_inits) > 0);
 
-	if ((ptr = FlsGetValue(_fls_index)) != NULL)
+	if ((ptr = TlsGetValue(_tls_index)) != NULL)
 		return ptr;
 
 	ptr = git__calloc(1, sizeof(git_global_st));
@@ -227,8 +222,23 @@ git_global_st *git__global_state(void)
 
 	git_buf_init(&ptr->error_buf, 0);
 
-	FlsSetValue(_fls_index, ptr);
+	TlsSetValue(_tls_index, ptr);
 	return ptr;
+}
+
+/**
+ * Free the TLS data associated with this thread.
+ * This should only be used by the thread as it
+ * is exiting.
+ */
+void git__free_tls_data(void) {
+    void *ptr = TlsGetValue(_tls_index);
+    if(!ptr)
+	return;
+
+    git__global_state_cleanup(ptr);
+    git__free(ptr);
+    TlsSetValue(_tls_index, NULL);
 }
 
 #elif defined(GIT_THREADS) && defined(_POSIX_THREADS)

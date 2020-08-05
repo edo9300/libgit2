@@ -1191,7 +1191,7 @@ int git_path_direach(
 	return error;
 }
 
-#if defined(GIT_WIN32) && !defined(__MINGW32__)
+#if defined(GIT_WIN32) && defined(__MINGW32__)
 
 /* Using _FIND_FIRST_EX_LARGE_FETCH may increase performance in Windows 7
  * and better.
